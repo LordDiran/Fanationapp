@@ -1,0 +1,24 @@
+name: CI
+
+# Every pull request into main, and every merge to main, must build clean.
+# npm run build runs the type-check (tsc --noEmit) and then vite build, so a
+# type error or a broken build fails the check and blocks the merge.
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+jobs:
+  build:
+    name: Type-check and build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - run: npm run build
