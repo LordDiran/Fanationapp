@@ -16,10 +16,12 @@ import {
 } from "@/services/features/auth/authSlice";
 
 import { SocialAuthButtons } from "@/components/auth/social-auth-buttons";
+import { useDeviceMetadata } from "@/hooks/auth/use-device-metadata";
 
 export default function Signup() {
   const navigate = useNavigate();
   const dispatch = useAppDispatch();
+  const deviceMetadata = useDeviceMetadata();
 
   const {
     control,
@@ -115,7 +117,7 @@ export default function Signup() {
             onSubmit={handleSubmit(submitForm)}
             noValidate
           >
-            <SocialAuthButtons />
+            <SocialAuthButtons {...deviceMetadata} />
 
             <div className="authdiv">or with email</div>
 
