@@ -35,6 +35,10 @@ export default function Login() {
   const deviceMetadata = useDeviceMetadata();
 
   const [notVerifiedError, setNotVerifiedError] = useState(false);
+  const [twoFaStep, setTwoFaStep] = useState(false);
+  const [twoFaCode, setTwoFaCode] = useState("");
+  const [useBackup, setUseBackup] = useState(false);
+  const [twoFaErr, setTwoFaErr] = useState(false);
 
   const { control, handleSubmit, getValues, register } =
     useForm<LoginFormValues>({
@@ -95,6 +99,27 @@ export default function Login() {
     }
   };
 
+  const completeLogin = (email: string) => {
+    const userObject = { email, role: "creator", usid: "dev-preview" };
+    localStorage.setItem("token", "dev-preview-token");
+    localStorage.setItem("userObject", JSON.stringify(userObject));
+    dispatch(updateUserObject(userObject));
+    setAuthed(true);
+    window.dispatchEvent(new Event("auth-complete"));
+    navigate("/feed", { replace: true });
+  };
+
+  const verify2Fa = () => {
+    const raw = twoFaCode.trim().toUpperCase();
+    // Accept any 6-digit TOTP code, or any XXXX-XXXX format backup code
+    const valid = useBackup
+      ? /^[A-Z0-9]{4}-[A-Z0-9]{4}$/.test(raw)
+      : /^\d{6}$/.test(twoFaCode);
+    if (!valid) { setTwoFaErr(true); return; }
+    completeLogin(JSON.parse(localStorage.getItem("_pending_email") ?? '""'));
+    localStorage.removeItem("_pending_email");
+  };
+
   const onSubmit = async (values: LoginFormValues) => {
     /*
      * VITE_PUBLIC_BASE_URL is blank locally — there is no backend for
@@ -104,15 +129,13 @@ export default function Login() {
      * was submitted with rather than a hardcoded credential.
      */
     if (import.meta.env.DEV) {
-      localStorage.setItem("token", "dev-preview-token");
-
-      const userObject = { email: values.email, role: "creator", usid: "dev-preview" };
-      localStorage.setItem("userObject", JSON.stringify(userObject));
-      dispatch(updateUserObject(userObject));
-      setAuthed(true);
-
-      window.dispatchEvent(new Event("auth-complete"));
-      navigate("/feed", { replace: true });
+      if (localStorage.getItem("fan_2fa") === "1") {
+        // Password accepted — store email temporarily and show 2FA step
+        localStorage.setItem("_pending_email", JSON.stringify(values.email));
+        setTwoFaStep(true);
+        return;
+      }
+      completeLogin(values.email);
       return;
     }
 
@@ -178,7 +201,69 @@ export default function Login() {
             Sign in to pick up where you left off.
           </div>
 
-          <form
+          {twoFaStep && (
+            <div className="card" style={{ padding: 26 }}>
+              <div className="display" style={{ fontSize: 22, marginBottom: 6 }}>
+                Two-factor verification
+              </div>
+              <p className="muted t13" style={{ marginBottom: 20 }}>
+                {useBackup
+                  ? "Enter one of your 8-character backup codes (e.g. A1B2-C3D4)."
+                  : "Enter the 6-digit code from your authenticator app."}
+              </p>
+
+              <label className="label" style={{ marginBottom: 6 }}>
+                {useBackup ? "Backup code" : "Authentication code"}
+              </label>
+              <input
+                autoFocus
+                className={"input" + (twoFaErr ? " err" : "")}
+                placeholder={useBackup ? "XXXX-XXXX" : "000000"}
+                value={twoFaCode}
+                maxLength={useBackup ? 9 : 6}
+                inputMode={useBackup ? "text" : "numeric"}
+                autoComplete="one-time-code"
+                style={{ letterSpacing: useBackup ? 2 : 4, fontSize: 20, textAlign: "center", marginBottom: 6 }}
+                onChange={(e) => {
+                  setTwoFaErr(false);
+                  const v = useBackup
+                    ? e.target.value.toUpperCase().replace(/[^A-Z0-9-]/g, "")
+                    : e.target.value.replace(/\D/g, "");
+                  setTwoFaCode(v);
+                }}
+                onKeyDown={(e) => { if (e.key === "Enter") verify2Fa(); }}
+              />
+              {twoFaErr && (
+                <p className="coral t12" style={{ marginBottom: 8 }}>
+                  {useBackup ? "Invalid backup code — check the format and try again." : "Incorrect code — check your app and try again."}
+                </p>
+              )}
+
+              <button
+                type="button"
+                className="btn btn-blue btn-block"
+                style={{ marginTop: 14, marginBottom: 12 }}
+                disabled={useBackup ? twoFaCode.length < 9 : twoFaCode.length < 6}
+                onClick={verify2Fa}
+              >
+                Verify &amp; sign in
+              </button>
+
+              <div className="row center" style={{ gap: 10, flexWrap: "wrap" }}>
+                <button type="button" className="blue t12 b6"
+                  onClick={() => { setUseBackup((b) => !b); setTwoFaCode(""); setTwoFaErr(false); }}>
+                  {useBackup ? "Use authenticator app instead" : "Use a backup code instead"}
+                </button>
+                <span className="muted t12">·</span>
+                <button type="button" className="muted t12 b6"
+                  onClick={() => { setTwoFaStep(false); setTwoFaCode(""); setTwoFaErr(false); localStorage.removeItem("_pending_email"); }}>
+                  Back to sign in
+                </button>
+              </div>
+            </div>
+          )}
+
+          {!twoFaStep && <form
             className="card"
             style={{ padding: 26 }}
             onSubmit={handleSubmit(onSubmit)}
@@ -303,6 +388,8 @@ export default function Login() {
               </button>
             </div>
           </form>
+
+          }
 
           <AuthLegal verb="continuing" />
         </div>
