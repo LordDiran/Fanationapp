@@ -24,6 +24,7 @@ export interface AppState {
   preferences: string[];
   prefsSet: boolean;
   currency: string;
+  twoFaEnabled: boolean;
   profile: {
     fullName: string;
     name: string; // display name — what the sidebar, profile header and @mentions show
@@ -76,6 +77,7 @@ export interface AppState {
   setLanguage(code: string): void;
   setPreferences(tags: string[]): void;
   setCurrency(code: string): void;
+  setTwoFaEnabled(v: boolean): void;
   updateProfile(p: Partial<AppState["profile"]>): void;
   becomeCreator(): void;
   toast(msg: string, tone?: "ok" | "err" | "", actionLabel?: string, action?: () => void): void;
@@ -129,6 +131,7 @@ export const useAppStore = create<AppState>()((set, get) => ({
   preferences: (() => { try { return JSON.parse(localStorage.getItem("fan_prefs") ?? "[]"); } catch { return []; } })(),
   prefsSet: localStorage.getItem("fan_prefs_set") === "1",
   currency: (() => { try { return localStorage.getItem("fan_currency") || detectCurrencyCode(); } catch { return "USD"; } })(),
+  twoFaEnabled: localStorage.getItem("fan_2fa") === "1",
   /* Matches the identity the sidebar's account card and the settings/logout
      copy already showed before this was editable — changing it here is the
      only place that needs to change now that both read from the store. */
@@ -187,6 +190,11 @@ export const useAppStore = create<AppState>()((set, get) => ({
   setCurrency: (code) => {
     try { localStorage.setItem("fan_currency", code); } catch { /* storage blocked */ }
     set({ currency: code });
+  },
+
+  setTwoFaEnabled: (v) => {
+    try { localStorage.setItem("fan_2fa", v ? "1" : "0"); } catch { /* storage blocked */ }
+    set({ twoFaEnabled: v });
   },
   /* Write first, then set. Only an explicit choice is ever stored — a visitor
      who never touches the toggle leaves no key behind, so the default stays

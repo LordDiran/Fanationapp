@@ -21,7 +21,8 @@ type Step = "idle" | "setup" | "done";
 export default function SettingsTwoFactorPage() {
   const navigate = useNavigate();
   const S = useAppStore();
-  const [step, setStep] = useState<Step>("idle");
+  // Initialise from persisted store so the page shows the right state after login
+  const [step, setStep] = useState<Step>(() => S.twoFaEnabled ? "done" : "idle");
   const [otherMethods, setOtherMethods] = useState({ SMS: false, Email: false, "Face ID": false });
   const [qrUrl, setQrUrl] = useState("");
   const [code, setCode] = useState("");
@@ -61,6 +62,7 @@ export default function SettingsTwoFactorPage() {
     if (code.length < 6) return;
     // Frontend simulation — in production validate against the backend TOTP
     setCodeErr(false);
+    S.setTwoFaEnabled(true);
     setStep("done");
   };
 
@@ -96,8 +98,14 @@ export default function SettingsTwoFactorPage() {
               sub="Connect your account with your 2FA app"
               on={step !== "idle"}
               onChange={() => {
-                if (step !== "idle") { setStep("idle"); setCode(""); setCodeErr(false); }
-                else setStep("setup");
+                if (step !== "idle") {
+                  S.setTwoFaEnabled(false);
+                  setStep("idle");
+                  setCode("");
+                  setCodeErr(false);
+                } else {
+                  setStep("setup");
+                }
               }}
             />
           </div>
